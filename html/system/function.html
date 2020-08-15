@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="../../css/element-ui.css">
+    <link rel="stylesheet" href="../../css/common.css">
+    <script src="../../js/vue.js" ></script>
+    <script src="../../js/element-ui.js" ></script>
+    <script src="../../js/data.js"></script>
+    <style type="text/css">
+        .show-form{
+            position: relative;
+            padding: 10px 10px;
+            border:1px solid rgba(30,144,255,0.5);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+<div id="main_div">
+    <el-row>
+        <el-button icon="el-icon-circle-plus-outline" @click="add">新增子节点</el-button>
+       <!-- <el-button icon="el-icon-edit">修改</el-button>
+        <el-button icon="el-icon-delete">删除</el-button>-->
+    </el-row>
+    <el-row :gutter="20">
+        <el-col :span="6">
+            <el-tree :data="functionList" :props="treeProps" @node-click="handleNodeClick"
+                     :highlight-current="true" :default-expand-all="true">
+            </el-tree>
+        </el-col>
+        <el-col :span="8">
+            <el-form class="show-form" ref="form" :model="form" label-width="80px">
+                <el-form-item label="名称" prop="name"
+                              :rules="[{required:true,message:'名称不能为空',trigger:'blur'}]">
+                    <el-input v-model="form.name" clearable></el-input>
+                </el-form-item>
+                <el-form-item label="访问路径">
+                    <el-input v-model="form.url" clearable></el-input>
+                </el-form-item>
+                <el-form-item label="图标">
+                    <el-input v-model="form.iconClass" clearable></el-input>
+                </el-form-item>
+                <el-form-item label="状态">
+                    <el-switch v-model.number="form.status" :active-value="1" :inactive-value="0"
+                               active-text="启用" inactive-text="停用">
+                    </el-switch>
+                </el-form-item>
+                <el-form-item label="序号" prop="seq" :rules="[{required:true,message:'请输入序号',trigger:'blur'},
+                              {type:'number',message:'请输入数字',trigger:'blur'}]">
+                    <el-input v-model.number="form.seq"></el-input>
+                </el-form-item>
+                <el-form-item label="备注">
+                    <el-input v-model="form.remark" type="textarea" clearable></el-input>
+                </el-form-item>
+                <el-form-item v-if="form.id">
+                    <el-button type="primary" @click="update">修改</el-button>
+                    <el-button type="danger" @click="deleteData">删除</el-button>
+                </el-form-item>
+            </el-form>
+        </el-col>
+    </el-row>
+
+    <el-dialog title="新增节点" :visible.sync="dialogFormVisible" width="40%" top="5vh">
+        <el-form ref="addForm" :model="addForm" label-width="90px">
+            <el-form-item label="父节点名称" v-if="addForm.parentName">
+                <el-input v-model="addForm.parentName" readonly></el-input>
+            </el-form-item>
+            <el-form-item label="名称" prop="name" :rules="[{required:true,message:'请输入名称',trigger:'blur'}]">
+                <el-input v-model="addForm.name"></el-input>
+            </el-form-item>
+            <el-form-item label="访问路径">
+                <el-input v-model="addForm.url"></el-input>
+            </el-form-item>
+            <el-form-item label="图标">
+                <el-input v-model="addForm.iconClass"></el-input>
+            </el-form-item>
+            <el-form-item label="状态">
+                <el-switch v-model.number="addForm.status" :active-value="1" :inactive-value="0"
+                           active-text="启用" inactive-text="停用">
+                </el-switch>
+            </el-form-item>
+            <el-form-item label="序号" prop="seq" :rules="[{required:true,message:'请输入序号',trigger:'blur'},
+            {type:'number',message:'请输入数字',trigger:'blur'}]">
+                <el-input v-model.number="addForm.seq"></el-input>
+            </el-form-item>
+            <el-form-item label="备注">
+                <el-input v-model="addForm.remark" type="textarea"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button @click="dialogFormVisible = false">取 消</el-button>
+                <el-button type="primary" @click="save">保存</el-button>
+            </el-form-item>
+        </el-form>
+    </el-dialog>
+</div>
+<script>
+    var flag=false;
+    var main=new Vue({
+        el:"#main_div",
+        data:function(){
+            return {
+                functionList:[{
+                    name:"根目录",
+                    status:1,
+                    children:null
+                }],
+                treeProps:{
+                    children:"children",
+                    label:"name"
+                },
+                form:getForm(),
+                addForm:getForm(),
+                level:0,
+                dialogFormVisible:false
+            }
+        },
+        mounted:function () {
+            this.getFunctionList();
+        },
+        methods:{
+            handleNodeClick:function (data) {
+                this.form=data;
+                flag=false;
+                this.getLevel(this.functionList,0);
+            },
+            getLevel:function (arr,index) {
+                for(var i in arr){
+                    if(arr[i]===this.form){
+                        this.level=index;
+                        flag=true;
+                    }else if(arr[i].children.length>0){
+                        this.getLevel(arr[i].children,index+1);
+                    }
+                    if(flag){
+                        break;
+                    }
+                }
+            },
+            add:function () {
+                if(this.form.name){
+                    if(this.level>=3){
+                        this.$message('最多只能有3级');
+                    }else{
+                        this.dialogFormVisible=true;
+                        this.addForm.parentId=this.form.id;
+                        this.addForm.parentName=this.form.name;
+                        this.$refs["addForm"].resetFields();
+                    }
+                }else{
+                    this.$message('请单击选择一个节点');
+                }
+            },
+            save:function () {
+                var  _this=this;
+                this.$refs["addForm"].validate(function(valid){
+                    if (valid) {
+                        /*axiosPost("/sys/function/add",_this.addForm,function (res) {
+                            _this.addForm=getForm();
+                            _this.getFunctionList();
+                            _this.dialogFormVisible = false;
+                        });*/
+                        _this.dialogFormVisible = false;
+                    } else {
+                        return false;
+                    }
+                });
+            },
+            update:function () {
+                var _this=this;
+                this.$refs["form"].validate(function(valid){
+                    if (valid) {
+                        /*axiosPost("/sys/function/update",_this.form,function () {
+                            _this.getFunctionList();
+                        });*/
+                    } else {
+                        return false;
+                    }
+                });
+            },
+            deleteData:function () {
+                var _this=this;
+                confirm("确定删除么?",function () {
+                    /*var url="/sys/function/delete?id="+_this.form.id;
+                    axiosGet(url,null,function (res) {
+                        _this.getFunctionList();
+                    });*/
+                });
+            },
+            getFunctionList:function () {
+                this.form=getForm();
+                var _this=this;
+                /*axiosGet("/sys/function/list",null,function (res) {
+                    _this.data[0].children=res.data.data;
+                });*/
+                _this.functionList[0].children=functionList;
+            }
+        }
+    });
+
+    function getForm() {
+        return {
+            id:null,
+            name:null,
+            url:null,
+            parentId:null,
+            status:1,
+            iconClass:null,
+            remark:null,
+            seq:null,
+            children:null
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="../../css/element-ui.css">
+    <link rel="stylesheet" href="../../css/common.css">
+    <script src="../../js/vue.js" ></script>
+    <script src="../../js/element-ui.js" ></script>
+    <script src="../../js/m-table.js"></script>
+    <script src="../../js/data.js"></script>
+</head>
+<body>
+<div id="main_div">
+    <el-row class="search-row">
+        <el-form ref="searchForm" :model="searchForm" label-width="60px">
+            <el-col :span="4">
+                <el-form-item label="名称">
+                    <el-input v-model="searchForm.name" clearable></el-input>
+                </el-form-item>
+            </el-col>
+            <el-col :span="4">
+                <el-form-item label="电话">
+                    <el-input v-model="searchForm.phone" clearable></el-input>
+                </el-form-item>
+            </el-col>
+            <el-col :span="4">
+                <el-form-item label="email">
+                    <el-input v-model="searchForm.email" clearable></el-input>
+                </el-form-item>
+            </el-col>
+        </el-form>
+    </el-row>
+    <el-row class="button-row">
+        <el-button icon="el-icon-search" @click="search">查询</el-button>
+        <el-button icon="el-icon-circle-plus-outline" @click="add">新增用户</el-button>
+        <el-button icon="el-icon-edit" @click="update">修改用户</el-button>
+        <el-button icon="el-icon-delete" @click="deleteData">删除用户</el-button>
+        <el-button icon="el-icon-edit" @click="showRole">设置角色</el-button>
+    </el-row>
+    <m-table ref="mTable" :table-config="tableConfig" :search-form='searchForm' @row-click="handleRowClick">
+        <el-table-column prop="name" label="名称" width="100"></el-table-column>
+        <el-table-column prop="loginAccount" label="登录账号" width="100"></el-table-column>
+        <el-table-column prop="phone" label="电话" width="120"></el-table-column>
+        <el-table-column prop="email" label="email" width="160"></el-table-column>
+        <el-table-column label="角色" width="200" :formatter="roleFormatter" :show-overflow-tooltip="true">
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" width="200" :show-overflow-tooltip="true"></el-table-column>
+    </m-table>
+
+    <el-dialog :title="title" :visible.sync="formVisible" width="40%" top="5vh">
+        <el-form ref="form" :model="form" label-width="80px" :rules="rules">
+            <el-form-item label="名称" prop="name" :rules="[{required:true,message:'请输入名称',trigger:'blur'}]">
+                <el-input v-model="form.name"></el-input>
+            </el-form-item>
+            <el-form-item label="登录账号" prop="loginAccount">
+                <el-input v-model="form.loginAccount"></el-input>
+            </el-form-item>
+            <el-form-item label="密码" prop="password" :rules="[{required:true,message:'请输入密码',trigger:'blur'}]">
+                <el-input v-model="form.password" type="password"></el-input>
+            </el-form-item>
+            <el-form-item label="确认密码" prop="checkPassword">
+                <el-input v-model="form.checkPassword" type="password"></el-input>
+            </el-form-item>
+            <el-form-item label="联系电话" prop="phone"
+                          :rules="[{required:true,message:'请输入联系电话',trigger:'blur'}]">
+                <el-input v-model="form.phone"></el-input>
+            </el-form-item>
+            <el-form-item label="email">
+                <el-input v-model="form.email"></el-input>
+            </el-form-item>
+            <el-form-item label="备注">
+                <el-input v-model="form.remark" type="textarea"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button @click="formVisible = false">取 消</el-button>
+                <el-button type="primary" @click="save">保存</el-button>
+            </el-form-item>
+        </el-form>
+    </el-dialog>
+
+    <el-dialog title="设置权限" :visible.sync="roleVisible" width="51%" top="5vh">
+        <el-transfer filterable :filter-method="filterMethod" filter-placeholder="请输入角色名称"
+                v-model="roles" :data="roleList" :titles="['所有角色', '已选角色']">
+        </el-transfer>
+        <div style="text-align: center;margin-top: 10px;margin-bottom: 10px">
+            <el-button @click="roleVisible = false">取 消</el-button>
+            <el-button type="primary" @click="setRoles">保存</el-button>
+        </div>
+    </el-dialog>
+</div>
+<script>
+    var main=new Vue({
+        el:"#main_div",
+        data:function(){
+            var validatePassword=function(rule, value, callback){
+                if (value !== main.form.password) {
+                    callback(new Error('两次输入密码不一致!'));
+                } else {
+                    callback();
+                }
+            };
+            var validateLoginAccount=function (rule, value, callback) {
+                axiosGet("/sys/user/list",{loginAccount:value},function (res) {
+                    var users=res.data.data;
+                    var flag=false;
+                    for(var i in users){
+                        if(users[i].id!=main.form.id&&users[i].loginAccount===value){
+                            flag=true;
+                            break;
+                        }
+                    }
+                    if(flag){
+                        callback(new Error("该账号已存在！"));
+                    }else {
+                        callback();
+                    }
+                })
+            };
+            return {
+                formVisible:false,
+                roleVisible:false,
+                title:"新增用户",
+                searchForm:{
+                    name:null,
+                    phone:null,
+                    email:null
+                },
+                form:getForm(),
+                rules:{
+                    checkPassword:[{required:true,message:'请再次输入密码',trigger:blur},
+                        { validator: validatePassword, trigger: 'blur'}],
+                    loginAccount:[{required:true,message:'请输入登录账号',trigger:blur},
+                        { validator: validateLoginAccount, trigger: 'blur'}]
+                },
+                tableConfig:{
+                    url:"", //请求列表数据url
+                    ref:"myTable",
+                    showPagination:true
+                },
+                currentChoose:null,
+                roleList:[],
+                roles:[]
+            }
+        },
+        mounted:function () {
+            //this.search();
+            this.getRoleList();
+            this.$refs.mTable.tableData=userList;
+            this.$refs.mTable.total=userList.length;
+        },
+        methods:{
+            search:function () {
+                this.currentChoose=null;
+                this.$refs["mTable"].search();
+            },
+            add:function () {
+                this.form=getForm();
+                this.formVisible=true;
+                this.title="新增用户";
+                this.$refs["form"].resetFields();
+            },
+            update:function () {
+                if(this.currentChoose){
+                    this.formVisible=true;
+                    this.title="修改用户";
+                    this.form=this.currentChoose;
+                    this.$refs["form"].resetFields();
+                }else{
+                    this.$message("请单击选择要修改的数据");
+                }
+            },
+            deleteData:function () {
+                if(this.currentChoose){
+                    var _this=this;
+                    confirm("确定删除么?",function () {
+                        var url="/sys/user/delete?id="+_this.currentChoose.id;
+                        /*axiosGet(url,null,function (res) {
+                            _this.search();
+                        });*/
+                    });
+                }else{
+                    this.$message("请单击选择要删除的数据");
+                }
+            },
+            showRole:function () {
+                if(this.currentChoose){
+                    this.roleVisible=true;
+                    var roles=this.currentChoose.roles;
+                    this.roles=[];
+                    for(var i in roles){
+                        this.roles.push(roles[i].id);
+                    }
+                }else{
+                    this.$message("请单击选择要设置角色的行");
+                }
+            },
+            setRoles:function () {
+                this.currentChoose.roles=[];
+                for(var i in this.roles){
+                    this.currentChoose.roles.push({id:this.roles[i]})
+                }
+                var _this=this;
+                /*axiosPost("/sys/user/role",this.currentChoose,function (res) {
+                    _this.roleVisible=false;
+                    _this.search();
+                });*/
+                _this.roleVisible=false;
+            },
+            save:function () {
+                var _this=this;
+                this.$refs["form"].validate(function(valid){
+                    if (valid) {
+                        var url=null;
+                        if(_this.title==='新增用户'){
+                            url="/sys/user/add";
+                        }else{
+                            url="/sys/user/update";
+                        }
+                        /*axiosPost(url,_this.form,function (res) {
+                            _this.formVisible=false;
+                            _this.form=getForm();
+                            _this.search();
+                        })*/
+                        _this.formVisible=false;
+                    } else {
+                        return false;
+                    }
+                });
+            },
+            handleRowClick:function (row, event, column) {
+                this.currentChoose=row;
+            },
+            getRoleList:function () {
+                var _this=this;
+                /*axiosGet("/sys/role/list",null,function (res) {
+
+                });*/
+                var roles=roleList;
+                for(var i in roles){
+                    var param={
+                        label:roles[i].name,
+                        key:roles[i].id
+                    };
+                    _this.roleList.push(param);
+                }
+            },
+            filterMethod:function (query, item) {
+                return item.label.indexOf(query) > -1;
+            },
+            roleFormatter:function (row, column, cellValue, index) {
+                var roles=row.roles;
+                if(roles){
+                    var arr=[];
+                    for(var i in roles){
+                        arr.push(roles[i].name);
+                    }
+                    return arr.join(',');
+                }
+                return '';
+            }
+        }
+    });
+
+    function getForm() {
+        return {
+            id:null,
+            name:null,
+            loginAccount:null,
+            password:null,
+            checkPassword:null,
+            phone:null,
+            email:null,
+            remark:null
+        }
+    }
+</script>
+</body>
+</html>

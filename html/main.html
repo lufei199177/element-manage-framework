@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="../css/element-ui.css">
+    <script src="../js/vue.js" ></script>
+    <script src="../js/element-ui.js" ></script>
+    <script src="../js/axios.min.js" ></script>
+    <script src="../js/data.js"></script>
+    <style type="text/css">
+        html,body,#body_div,.el-container{
+            height: 100%;
+        }
+        body{
+            margin: 0px;
+        }
+        .el-aside{
+            height: 100%;
+            background-color: #545c64;
+        }
+        .el-menu{
+            border-right: solid 0px #e6e6e6;
+        }
+        .el-header{
+            padding: 0px 0px;
+            background-color: #4E5465;
+        }
+        .el-menu-vertical-demo:not(.el-menu--collapse) {
+            width: 200px;
+            min-height: 400px;
+        }
+        .el-main{
+            height: 100%;
+            width: 100%;
+            font-size:0;
+            padding: 0 0;
+        }
+        .el-tabs__item{
+            padding: 0px 10px;
+            color: rgba(255,255,255,.7);
+        }
+        .el-tabs--top.el-tabs--card .el-tabs__item:last-child{
+            padding-right: 10px;
+        }
+        .el-tabs--card>.el-tabs__header .el-tabs__nav{
+            border-top: none;
+            border-radius: 0 0;
+        }
+        .el-tabs--card>.el-tabs__header .el-tabs__item{
+            border-bottom:0px;
+        }
+        /*
+        设置tabs选中背景颜色
+        */
+        .el-tabs--card>.el-tabs__header .el-tabs__item.is-active{
+            background-color: white;
+        }
+        .el-tabs--card>.el-tabs__header{
+            border-bottom: 0px;
+        }
+        /*
+        设置右边个人信息字体颜色
+         */
+        .el-dropdown{
+            color: white;
+        }
+        .el-menu-item, .el-submenu__title{
+            line-height: 50px;
+            height: 50px;
+        }
+        .el-submenu .el-menu-item{
+            line-height: 40px;
+            height: 40px;
+        }
+    </style>
+</head>
+<body>
+<div id="body_div">
+    <el-container>
+        <el-aside style="width: auto">
+            <el-menu :default-active="leftDefaultActive" class="el-menu-vertical-demo" @select="handleLeftSelect"
+                     background-color="#545c64" text-color="#fff" active-text-color="#ffd04b"
+                     :collapse="isCollapse" :default-openeds="leftOpened" @open="handleLeftOpen"
+                     @close="handleLeftClose">
+                <el-menu-item index="logo_position" disabled style="cursor: default;opacity:1;">
+                    <i class="el-icon-info"></i>
+                    <span>公司名称</span>
+                </el-menu-item>
+                <template v-for="(item,i) in leftMenuItems">
+                    <el-menu-item :index="i+''" v-if="item.children==null||item.children.length===0">
+                        <i :class="item.iconClass"></i>
+                        <span v-text="item.name"></span>
+                    </el-menu-item>
+                    <el-submenu v-else :index="i+''">
+                        <template slot="title">
+                            <i :class="item.iconClass"></i>
+                            <span v-text="item.name"></span>
+                        </template>
+                        <template v-for="(child,j) in item.children">
+                            <el-menu-item :index="i+'-'+j" v-if="child.children==null||child.children.length===0">
+                                <i :class="child.iconClass"></i>
+                                <span v-text="child.name"></span>
+                            </el-menu-item>
+                            <el-submenu v-else :index="i+'-'+j">
+                                <template slot="title">
+                                    <i :class="child.iconClass"></i>
+                                    <span v-text="child.name"></span>
+                                </template>
+                                <el-menu-item v-for="(grandChild,k) in child.children" :index="i+'-'+j+'-'+k">
+                                    <i :class="grandChild.iconClass"></i>
+                                    <span v-text="grandChild.name"></span>
+                                </el-menu-item>
+                            </el-submenu>
+                        </template >
+                    </el-submenu>
+                </template>
+            </el-menu>
+        </el-aside>
+
+        <el-container>
+            <el-header style="height: 40px;overflow: hidden;line-height: 40px">
+                <div style="float: left;margin: 0px 5px;cursor: pointer">
+                    <span :class="collapseClass" @click="collapseClick"></span>
+                </div>
+                <el-tabs type="card" v-model="tabIndex" @tab-remove="removeTab" @tab-click="tabClick"
+                         style="float: left;width: 80%">
+                    <el-tab-pane v-for="(item,i) in headerMenuItems" :label="item.title" :name="i+''"
+                                 :closable="true">
+                    </el-tab-pane>
+                </el-tabs>
+
+                <el-dropdown style="float: right;margin-right: 50px;cursor: pointer" @command="handleCommand">
+                    <span class="el-dropdown-link">
+                        <i class="el-icon-menu"></i>
+                        {{userName}}
+                    </span>
+                    <el-dropdown-menu slot="dropdown">
+                        <el-dropdown-item v-for="(item,i) in userMenuItems" :command="i">
+                            <i :class="item.classInfo"></i>
+                            {{item.title}}
+                        </el-dropdown-item>
+                        <el-dropdown-item>
+                            <div @click="quite">注销</div>
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </el-dropdown>
+
+            </el-header>
+
+            <el-main>
+                <iframe name="myFrame" frameborder="0" scrolling="no" marginwidth="0" marginheight="0"  width="100%"
+                        height="100%" v-for="(item,i) in headerMenuItems" :src="item.path"
+                        v-show="i===headerIndex" :id="'iframe'+i">
+                </iframe>
+            </el-main>
+        </el-container>
+    </el-container>
+</div>
+<script type="text/javascript">
+    var userKey=null;
+    var main=new Vue({
+        el:"#body_div",
+        data:function(){
+            return {
+                leftOpened:[],
+                leftDefaultActive:"0",
+                isCollapse:false,
+                collapseClass:"el-icon-caret-left",
+                leftMenuItems:null,
+                headerMenuItems:[],
+                userMenuItems:[{
+                    title:"个人信息",
+                    iconClass:"el-icon-news",
+                    url:"user/userInfo.html"
+                },{
+                    title:"修改密码",
+                    iconClass:"el-icon-edit",
+                    url:"user/editPassword.html"
+                }],
+                headerIndex:0,
+                tabIndex:'0',
+                userName:localStorage.getItem("userName")
+            }
+        },
+        mounted:function () {
+            this.leftMenuItems=functionList;
+            var param={
+                key:'0',
+                title:this.leftMenuItems[0].name,
+                path:this.leftMenuItems[0].url
+            };
+            this.headerMenuItems.push(param);
+        },
+        methods: {
+            collapseClick:function(){
+                this.isCollapse=!this.isCollapse;
+                if(this.isCollapse){
+                    this.collapseClass="el-icon-caret-right";
+                }else{
+                    this.collapseClass="el-icon-caret-left";
+                }
+            },
+            handleLeftSelect:function(key, keyPath) {
+                var arr=key.split('-');
+                this.leftDefaultActive=key;
+                var item=this.leftMenuItems[parseInt(arr[0])];
+                for(var i=1;i<arr.length;i++){
+                    item=item.children[parseInt(arr[i])];
+                }
+                var flag=false;
+                var index=0;
+                for(var i in this.headerMenuItems){
+                    if(this.headerMenuItems[i].key===key){
+                        flag=true;
+                        index=parseInt(i);
+                        break;
+                    }
+                }
+                if(flag){
+                    if(index!=this.headerIndex){
+                        this.headerIndex=index;
+                        this.tabIndex=index+'';
+                    }
+                }else{
+                    var param={
+                        key:key,
+                        title:item.name,
+                        path:item.url
+                    };
+                    this.headerMenuItems.push(param);
+                    this.headerIndex=this.headerMenuItems.length-1;
+                    this.tabIndex=this.headerIndex+'';
+                }
+            },
+            tabClick:function (tab, event) {
+                this.headerIndex=parseInt(this.tabIndex);
+                var id=this.headerMenuItems[this.headerIndex].key;
+                this.leftDefaultActive=id;
+                var index=id.substr(0,1);
+                this.leftOpened=[];
+                this.leftOpened.push(index);
+                //document.getElementById('iframe'+this.headerIndex).contentWindow.location.reload(true);
+            },
+            removeTab:function (targetName){
+                if(this.headerMenuItems.length>1){
+                    var index=parseInt(targetName);
+                    this.headerMenuItems.splice(index,1);
+                    if(this.headerIndex>index){
+                        this.headerIndex--;
+                    }else if(this.headerIndex===index){
+                        if(this.headerIndex===this.headerMenuItems.length){
+                            this.headerIndex--;
+                        }
+                        var key=this.headerMenuItems[this.headerIndex].key;
+                        this.leftDefaultActive=key;
+                    }
+                    this.tabIndex=this.headerIndex+'';
+                }
+            },
+            handleCommand:function(command) {
+                if(command!=null){
+                    var item=this.userMenuItems[command];
+                    var url=item.url;
+                    userKey=null;
+                    this.selectKey(url,this.leftMenuItems,'');
+                    if(userKey){
+                        this.handleLeftSelect(userKey);
+                    }
+                }
+            },
+            selectKey:function (url,arr,key) {
+                for(var i in arr){
+                    var item=arr[i];
+                    if(item.children.length>0){
+                        var children=item.children;
+                        this.selectKey(url,children,key+i+'-');
+                    }else if(item.url===url){
+                        userKey=key+i;
+                    }
+                    if(userKey){
+                        break;
+                    }
+                }
+            },
+            handleLeftOpen:function (key,keyPath) {
+                if(this.leftOpened.indexOf(key)===-1){
+                    this.leftOpened.push(key);
+                }
+            },
+            handleLeftClose:function (key,keyPath) {
+                this.leftOpened=this.leftOpened.filter(function (value) {
+                    return value!=key;
+                });
+            },
+            quite:function () {
+                /*axiosGet("/sys/quite",null,function (res) {
+                    window.location.href="/";
+                });*/
+                window.location.href="/";
+            }
+        }
+    });
+</script>
+</body>
+</html>

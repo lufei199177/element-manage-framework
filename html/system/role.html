@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="../../css/element-ui.css">
+    <link rel="stylesheet" href="../../css/common.css">
+    <script src="../../js/vue.js" ></script>
+    <script src="../../js/element-ui.js" ></script>
+    <script src="../../js/m-table.js" ></script>
+    <script src="../../js/data.js"></script>
+</head>
+<body>
+<div id="main_div">
+    <el-row class="search-row">
+        <el-form ref="searchForm" :model="searchForm" label-width="60px">
+            <el-col :span="5">
+                <el-form-item label="名称">
+                    <el-input v-model="searchForm.name" clearable></el-input>
+                </el-form-item>
+            </el-col>
+        </el-form>
+    </el-row>
+    <el-row class="button-row">
+        <el-button icon="el-icon-search" @click="search">查询</el-button>
+        <el-button icon="el-icon-circle-plus-outline" @click="add">新增角色</el-button>
+        <el-button icon="el-icon-edit" @click="update">修改角色</el-button>
+        <el-button icon="el-icon-delete" @click="deleteData">删除角色</el-button>
+        <el-button icon="el-icon-edit" @click="showFunction">设置权限</el-button>
+    </el-row>
+    <div>
+        <m-table ref="mTable" :table-config="tableConfig" :search-form="searchForm" @row-click="handleRowClick">
+            <el-table-column prop="name" label="名称" width="180"></el-table-column>
+            <el-table-column prop="remark" label="备注" width="200"></el-table-column>
+        </m-table>
+    </div>
+
+    <el-dialog :title="title" :visible.sync="formVisible" width="25%" top="5vh">
+        <el-form ref="form" :model="form" label-width="60px" :rules="rules">
+            <el-form-item label="名称" prop="name">
+                <el-input v-model="form.name"></el-input>
+            </el-form-item>
+            <el-form-item label="备注">
+                <el-input v-model="form.remark" type="textarea"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button @click="formVisible = false">取 消</el-button>
+                <el-button type="primary" @click="save">保存</el-button>
+            </el-form-item>
+        </el-form>
+    </el-dialog>
+
+    <el-dialog title="设置权限" :visible.sync="functionVisible" width="30%" top="5vh">
+        <el-tree :data="functionList" ref="functionTree" show-checkbox node-key="id" :default-expand-all="true"
+                 :default-checked-keys="defaultCheckedKeys" :props="treeProps">
+        </el-tree>
+        <div style="text-align: center;margin-top: 10px;margin-bottom: 10px">
+            <el-button @click="functionVisible = false">取 消</el-button>
+            <el-button type="primary" @click="setFunction">保存</el-button>
+        </div>
+    </el-dialog>
+</div>
+<script>
+    var main=new Vue({
+        el:"#main_div",
+        data:function(){
+            var validateName=function (rule, value, callback) {
+                /*axiosGet("/sys/role/list",{name:value},function (res) {
+
+                });*/
+                var roles=roleList;
+                var flag=false;
+                for(var i in roles){
+                    if(main.form.id!=roles[i].id&&value===roles[i].name){
+                        flag=true;
+                    }
+                }
+                if(flag){
+                    callback(new Error('该名称已存在!'));
+                }else{
+                    callback();
+                }
+            };
+            return {
+                formVisible:false,
+                functionVisible:false,
+                title:"新增角色",
+                searchForm:{
+                    name:null
+                },
+                form:getForm(),
+                tableData:[],
+                currentChoose:null,
+                functionList:null,
+                treeProps:{
+                    children:"children",
+                    label:"name"
+                },
+                defaultCheckedKeys:null,
+                rules:{
+                    name:[{required:true,message:'请输入名称',trigger:'blur'},
+                        { validator: validateName, trigger: 'blur' }]
+                },
+                tableConfig:{
+                    url:"", //请求列表数据url
+                    ref:"myTable",
+                    showPagination:true
+                }
+            }
+        },
+        mounted:function () {
+            this.getFunctionList();
+            this.$refs.mTable.tableData=roleList;
+            this.$refs.mTable.total=roleList.length;
+        },
+        methods:{
+            search:function () {
+                this.currentChoose=null;
+                this.$refs["mTable"].search();
+            },
+            add:function () {
+                this.form=getForm();
+                this.formVisible=true;
+                this.title="新增角色";
+                this.$refs["form"].resetFields();
+            },
+            update:function () {
+                if(this.currentChoose){
+                    this.formVisible=true;
+                    this.title="修改角色";
+                    this.form=this.currentChoose;
+                    this.$refs["form"].resetFields();
+                }else{
+                    this.$message("请单击选择要修改的数据");
+                }
+            },
+            deleteData:function () {
+                if(this.currentChoose){
+                    var _this=this;
+                    confirm("确定删除么?",function () {
+                        var url="/sys/role/delete?id="+_this.currentChoose.id;
+                        /*axiosGet(url,null,function (res) {
+                            _this.search();
+                        });*/
+                    });
+                }else{
+                    this.$message("请单击选择要删除的数据");
+                }
+            },
+            showFunction:function () {
+                if(this.currentChoose){
+                    this.functionVisible=true;
+                    this.defaultCheckedKeys=this.currentChoose.functions;
+                    if(this.$refs["functionTree"]){
+                        this.$refs["functionTree"].setCheckedKeys(this.currentChoose.functions);
+                    }
+
+                }else{
+                    this.$message("请单击选择要设置权限的行");
+                }
+            },
+            setFunction:function () {
+                var checkFunctions=this.$refs["functionTree"].getCheckedKeys();
+                var param={
+                    id:this.currentChoose.id,
+                    functions:checkFunctions
+                };
+                var _this=this;
+                /*axiosPost("/sys/role/function",param,function (res) {
+                    _this.functionVisible=false;
+                });*/
+                _this.functionVisible=false;
+            },
+            save:function () {
+                var _this=this;
+                this.$refs["form"].validate(function(valid){
+                    if (valid) {
+                        var url=null;
+                        if(_this.title==='新增角色'){
+                            url="/sys/role/add";
+                        }else{
+                            url="/sys/role/update";
+                        }
+                        /*axiosPost(url,_this.form,function (res) {
+                            _this.formVisible=false;
+                            _this.form=getForm();
+                            _this.search();
+                        })*/
+                        _this.formVisible=false;
+                    } else {
+                        return false;
+                    }
+                });
+            },
+            handleRowClick:function (row, event, column) {
+                this.currentChoose=row;
+            },
+            getFunctionList:function () {
+                var _this=this;
+                /*axiosGet("/sys/function/list",null,function (res) {
+                    _this.data=res.data.data;
+                });*/
+                _this.functionList=functionList;
+            }
+        }
+    });
+
+    function getForm() {
+        return {
+            id:null,
+            name:null,
+            remark:null
+        }
+    }
+</script>
+</body>
+</html>
